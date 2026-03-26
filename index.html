@@ -4,6 +4,14 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
 <title>BulkUp — AI Fitness Tracker</title>
+<meta name="theme-color" content="#e8541e"/>
+<meta name="description" content="AI-powered bulking tracker with food scanner, workout log, and macro tracking"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="BulkUp"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -25,7 +33,7 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:100;background:var(--bg2);bor
 .nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--text3);font-family:var(--font-body);font-size:10px;cursor:pointer;padding:6px 10px;border-radius:8px;transition:all .2s}
 .nav-btn svg{width:20px;height:20px;stroke-width:1.8;stroke:currentColor}
 .nav-btn.active{color:var(--accent)}
-.nav-btn.scan-btn{background:var(--accent);color:#fff !important;border-radius:14px;padding:8px 14px;margin-top:-18px;border:3px solid var(--bg)}
+.nav-btn.scan-btn{background:var(--accent);color:#fff !important;border-radius:14px;padding:8px 14px;margin-top:-22px;margin-bottom:4px;border:3px solid var(--bg)}
 .nav-btn.scan-btn svg{stroke:#fff !important}
 
 .page{display:none;padding:16px 16px 88px;max-width:480px;margin:0 auto;min-height:100vh}
@@ -729,16 +737,21 @@ function analyzeFood(base64){
   var progEl=document.getElementById('scanProgressText');
   var msgInt=setInterval(function(){mi=(mi+1)%msgs.length;progEl.textContent=msgs[mi];},1400);
 
-  fetch('https://api.anthropic.com/v1/messages',{
+  fetch('https://openrouter.ai/api/v1/chat/completions',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer sk-or-free',
+      'HTTP-Referer':'https://daxx-fit.vercel.app',
+      'X-Title':'BulkUp Food Scanner'
+    },
     body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
+      model:'nvidia/llama-nemotron-nano-vl-8b-v1:free',
       max_tokens:600,
       messages:[{
         role:'user',
         content:[
-          {type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},
+          {type:'image_url',image_url:{url:'data:image/jpeg;base64,'+base64}},
           {type:'text',text:'You are a nutrition expert. Look at this food image and respond ONLY with a JSON object — no markdown, no backticks, no explanation.\n\nEstimate the food and its nutritional values for a single typical serving. If multiple foods, estimate the whole plate.\n\nJSON format:\n{"name":"Food name (Indonesian name if applicable)","portion":"e.g. 1 plate ~300g","calories":350,"protein":25,"fat":12,"carbs":40,"fiber":3,"confidence":"high|medium|low","note":"brief nutritional note"}\n\nIf NOT food: {"error":"Not food"}\n\nRespond ONLY with raw JSON.'}
         ]
       }]
@@ -752,7 +765,7 @@ function analyzeFood(base64){
   })
   .then(function(data){
     var rawText='';
-    if(data.content){for(var i=0;i<data.content.length;i++){if(data.content[i].type==='text'){rawText=data.content[i].text;break;}}}
+    if(data.choices&&data.choices[0]&&data.choices[0].message){rawText=data.choices[0].message.content||'';}
     var parsed;
     try{parsed=JSON.parse(rawText.replace(/```json|```/g,'').trim());}
     catch(e){showScanError('Could not parse result. Try a clearer photo.');}
@@ -864,6 +877,11 @@ buildDashboard();
 buildWeekGrid();
 buildNutrition();
 buildProgress();
+
+// Register PWA service worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(function(e){console.log('SW reg failed:',e);});
+}
 </script>
 </body>
 </html>
